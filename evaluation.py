@@ -63,7 +63,10 @@ def neighbor_indices(embedding, n_neighbors=30):
 
 
 def mixing_metrics(embedding, labels, n_neighbors=30):
-    """Measure source mixing among the 30 nearest cells.
+    """
+     AI generated code
+    
+    Measure source mixing among the 30 nearest cells.
 
     The inverse Simpson calculation here uses a fixed number of neighbors.
     It is NOT the standard perplexity-based iLISI estimator from Harmony papers.

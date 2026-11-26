@@ -12,6 +12,7 @@ import pandas as pd
 
 def normalize_rows(matrix: np.ndarray) -> np.ndarray:
     """
+    Ziqi Liu
     Normalize each row to unit length, leaving zero rows unchanged.
 
     Args:
@@ -37,8 +38,208 @@ def normalize_rows(matrix: np.ndarray) -> np.ndarray:
     return normalized
 
 
+def sample_centroids(
+    z_cos: np.ndarray,
+    n_clusters: int,
+    rng: np.random.Generator
+) -> np.ndarray:
+    """
+    Ziqi Liu
+    Sample distinct cell positions as initial cluster centers.
+
+    Args:
+        z_cos: A cells-by-dimensions matrix with normalized rows.
+        n_clusters: The number of centers to sample.
+        rng: A NumPy random generator for sampling.
+
+    Returns:
+        A clusters-by-dimensions matrix of sampled centers.
+    """
+    n_cells = len(z_cos)
+
+    if not 1 <= n_clusters <= n_cells:
+        raise ValueError(
+            "number of cluster must between 1 and number of cells"
+        )
+
+    first_index = rng.integers(n_cells)
+
+    selected = [first_index]
+
+    closest_distance = np.sum(
+        (z_cos - z_cos[first_index]) ** 2, axis=1
+    )
+
+    for _ in range(1, n_clusters):
+        total_dis = np.sum(closest_distance)
+
+        if total_dis == 0:
+
+            available = np.ones(n_cells, dtype=bool)
+            available[selected] = False
+
+            candidates = np.flatnonzero(available)
+            next_index = rng.choice(candidates)
+
+        else:
+            prob = closest_distance / total_dis
+
+            next_index = rng.choice(
+                n_cells, p=prob
+            )
+
+        selected.append(next_index)
+
+        new_dist = np.sum(
+            (z_cos - z_cos[next_index]) ** 2, axis=1
+        )
+
+        closest_distance = np.minimum(
+            closest_distance, new_dist
+        )
+
+    return z_cos[selected].copy()
+
+
+def update_centroids(
+    z_cos: np.ndarray,
+    centers: np.ndarray
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    AI help us to write this function.
+    Assign cells to their nearest centers and calculate cluster means.
+
+    Args:
+        z_cos: A cells-by-dimensions matrix with normalized rows.
+        centers: The current clusters-by-dimensions center matrix.
+
+    Returns:
+        A tuple containing updated centers, cell counts per cluster,
+        and the assigned cluster index for each cell.
+    """
+    n_cells = len(z_cos)
+    n_clusters = len(centers)
+
+    cell_squares = np.sum(z_cos ** 2, axis=1)
+    center_squares = np.sum(centers ** 2, axis=1)
+    dot_products = np.matmul(z_cos, centers.T)
+    distances = np.zeros_like(dot_products)
+
+    for k in range(n_clusters):
+        distances[:, k] = (
+            cell_squares + center_squares[k] - 2 * dot_products[:, k]
+        )
+
+    labels = np.argmin(distances, axis=1)
+    counts = np.zeros(n_clusters, dtype=int)
+    updated = np.zeros_like(centers)
+
+    for i in range(n_cells):
+        cluster = labels[i]
+        counts[cluster] += 1
+        updated[cluster] += z_cos[i]
+
+    for k in range(n_clusters):
+        if counts[k] > 0:
+            updated[k] /= counts[k]
+
+    return updated, counts, labels
+
+
+def recover_empty_centroids(
+    z_cos: np.ndarray,
+    updated: np.ndarray,
+    counts: np.ndarray,
+    labels: np.ndarray,
+    rng: np.random.Generator
+) -> np.ndarray:
+    """
+    Ziqi Liu
+    Replace empty cluster centers with selected cell positions.
+
+    Args:
+        z_cos: A cells-by-dimensions matrix with normalized rows.
+        updated: The center matrix to modify in place.
+        counts: The number of cells assigned to each cluster.
+        labels: The assigned cluster index for each cell.
+        rng: A NumPy random generator for fallback sampling.
+
+    Returns:
+        The updated center matrix with empty centers replaced.
+    """
+    n_cells = len(z_cos)
+    n_clusters = len(updated)
+    donors = []
+
+    for k in range(n_clusters - 1, -1, -1):
+        if counts[k] >= 2:
+            donors.append(k)
+
+    empty_clusters = np.flatnonzero(counts == 0)
+
+    used = np.zeros(n_cells, dtype=bool)
+
+    for j, k in enumerate(empty_clusters):
+
+        if j < len(donors):
+
+            donor = donors[j]
+
+            donor_cells = np.flatnonzero(
+                labels == donor
+            )
+
+            index = int(donor_cells[-1])
+
+        else:
+
+            candidates = np.flatnonzero(~used)
+
+            index = rng.choice(candidates)
+
+        updated[k] = z_cos[index]
+
+        used[index] = True
+
+    return updated
+
+
+def initialize_centroids(
+    z_cos: np.ndarray,
+    n_clusters: int,
+    rng: np.random.Generator
+) -> np.ndarray:
+    """
+    Ziqi Liu
+    Initialize centers using weighted sampling and 10 clustering rounds.
+
+    Args:
+        z_cos: A cells-by-dimensions matrix with normalized rows.
+        n_clusters: The number of cluster centers to initialize.
+        rng: A NumPy random generator for sampling cell positions.
+
+    Returns:
+        A clusters-by-dimensions matrix of normalized cluster centers.
+    """
+    centers = sample_centroids(z_cos, n_clusters, rng)
+
+    for _ in range(10):
+        updated, counts, labels = update_centroids(z_cos, centers)
+
+        centers = recover_empty_centroids(
+            z_cos,
+            updated,
+            counts,
+            labels,
+            rng
+        )
+
+    return normalize_rows(centers)
+
+
 def softmax(logits: np.ndarray) -> np.ndarray:
     """
+    Ziqi Liu
     Convert each row of scores into a probability distribution.
 
     Args:
@@ -68,6 +269,7 @@ def softmax(logits: np.ndarray) -> np.ndarray:
 def encode_batch_column(labels: pd.Series,
                         key: str) -> tuple[np.ndarray, int, list[str]]:
     """
+    Ziqi Liu
     Encode one metadata column as a one-hot matrix.
 
     Args:
@@ -108,6 +310,7 @@ def encode_batches(metadata: pd.DataFrame,
                    vars_use: str | list[str]
                    ) -> tuple[np.ndarray, np.ndarray, list[str]]:
     """
+    Ziqi Liu
     Convert categorical metadata into a combined one-hot matrix.
 
     Args:
@@ -155,6 +358,7 @@ def expand_parameter(value: float | list[float] | np.ndarray,
                      level_counts: np.ndarray,
                      name: str) -> np.ndarray:
     """
+    AI help us to write this function.
     Expand parameter values into one value per batch category.
 
     Args:
@@ -199,177 +403,6 @@ def expand_parameter(value: float | list[float] | np.ndarray,
     return result
 
 
-def sample_centroids(
-    z_cos: np.ndarray,
-    n_clusters: int,
-    rng: np.random.Generator
-) -> np.ndarray:
-    """
-    Sample distinct cell positions as initial cluster centers.
-
-    Args:
-        z_cos: A cells-by-dimensions matrix with normalized rows.
-        n_clusters: The number of centers to sample.
-        rng: A NumPy random generator for sampling.
-
-    Returns:
-        A clusters-by-dimensions matrix of sampled centers.
-    """
-    n_cells = len(z_cos)
-    random_values = rng.random(n_clusters)
-    indices = np.zeros(n_clusters, dtype=int)
-
-    for k in range(n_clusters):
-        index = int(np.floor(random_values[k] * n_cells + 5e-1))
-
-        if index >= n_cells:
-            index = n_cells - 1
-
-        indices[k] = index
-
-    centers = z_cos[indices].copy()
-    chosen = np.zeros(n_cells, dtype=bool)
-
-    for k in range(n_clusters):
-        similarities = np.matmul(z_cos, centers[k])
-        distance = np.abs(2.0 * (1.0 - similarities))
-
-        draws = rng.random(n_cells)
-        draws = np.maximum(draws, np.finfo(float).tiny)
-        scores = -np.log(draws) / (distance + 1e-10)
-
-        # Exclude cells already selected as centers.
-        scores[chosen] = np.inf
-
-        selected = int(np.argmin(scores))
-        centers[k] = z_cos[selected]
-        chosen[selected] = True
-
-    return centers
-
-
-def update_centroids(
-    z_cos: np.ndarray,
-    centers: np.ndarray
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """
-    Assign cells to their nearest centers and calculate cluster means.
-
-    Args:
-        z_cos: A cells-by-dimensions matrix with normalized rows.
-        centers: The current clusters-by-dimensions center matrix.
-
-    Returns:
-        A tuple containing updated centers, cell counts per cluster,
-        and the assigned cluster index for each cell.
-    """
-    n_cells = len(z_cos)
-    n_clusters = len(centers)
-
-    cell_squares = np.sum(z_cos ** 2, axis=1)
-    center_squares = np.sum(centers ** 2, axis=1)
-    dot_products = np.matmul(z_cos, centers.T)
-    distances = np.zeros_like(dot_products)
-
-    for k in range(n_clusters):
-        distances[:, k] = (
-            cell_squares + center_squares[k]
-            - 2 * dot_products[:, k]
-        )
-
-    labels = np.argmin(distances, axis=1)
-    counts = np.zeros(n_clusters, dtype=int)
-    updated = np.zeros_like(centers)
-
-    for i in range(n_cells):
-        cluster = labels[i]
-        counts[cluster] += 1
-        updated[cluster] += z_cos[i]
-
-    for k in range(n_clusters):
-        if counts[k] > 0:
-            updated[k] /= counts[k]
-
-    return updated, counts, labels
-
-
-def recover_empty_centroids(
-    z_cos: np.ndarray,
-    updated: np.ndarray,
-    counts: np.ndarray,
-    labels: np.ndarray,
-    rng: np.random.Generator
-) -> np.ndarray:
-    """
-    Replace empty cluster centers with selected cell positions.
-
-    Args:
-        z_cos: A cells-by-dimensions matrix with normalized rows.
-        updated: The center matrix to modify in place.
-        counts: The number of cells assigned to each cluster.
-        labels: The assigned cluster index for each cell.
-        rng: A NumPy random generator for fallback sampling.
-
-    Returns:
-        The updated center matrix with empty centers replaced.
-    """
-    n_cells = len(z_cos)
-    n_clusters = len(updated)
-    donors = []
-
-    for k in range(n_clusters - 1, -1, -1):
-        if counts[k] >= 2:
-            donors.append(k)
-
-    empty_clusters = np.flatnonzero(counts == 0)
-
-    for j, k in enumerate(empty_clusters):
-        if j < len(donors):
-            donor = donors[j]
-
-            # Use the donor cluster's last cell in the original row order.
-            donor_cells = np.flatnonzero(labels == donor)
-            index = int(donor_cells[-1])
-        else:
-            index = rng.integers(n_cells)
-
-        updated[k] = z_cos[index]
-
-    return updated
-
-
-def initialize_centroids(
-    z_cos: np.ndarray,
-    n_clusters: int,
-    rng: np.random.Generator
-) -> np.ndarray:
-    """
-    Initialize centers using weighted sampling and 10 clustering rounds.
-
-    Args:
-        z_cos: A cells-by-dimensions matrix with normalized rows.
-        n_clusters: The number of cluster centers to initialize.
-        rng: A NumPy random generator for sampling cell positions.
-
-    Returns:
-        A clusters-by-dimensions matrix of normalized cluster centers.
-    """
-    centers = sample_centroids(z_cos, n_clusters, rng)
-
-    for _ in range(10):
-        updated, counts, labels = update_centroids(z_cos, centers)
-
-        centers = recover_empty_centroids(
-            z_cos,
-            updated,
-            counts,
-            labels,
-            rng
-        )
-
-    return normalize_rows(centers)
-
-
 def assignment_probabilities(distances: np.ndarray,
                              sigma: np.ndarray,
                              expected: np.ndarray,
@@ -377,6 +410,7 @@ def assignment_probabilities(distances: np.ndarray,
                              theta: np.ndarray,
                              phi: np.ndarray) -> np.ndarray:
     """
+    Ziqi Liu
     Calculate soft cluster assignments using distance and batch diversity.
 
     Args:
@@ -432,6 +466,7 @@ def update_assignments(r: np.ndarray,
                        rng: np.random.Generator
                        ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
+    AI help us to write this function
     Update soft cluster assignments in randomly ordered blocks of cells.
 
     Args:
@@ -527,6 +562,7 @@ def calculate_objective(r: np.ndarray,
                         sigma: np.ndarray,
                         theta: np.ndarray) -> tuple[float, np.ndarray]:
     """
+    Ziqi liu
     Calculate the clustering objective from distance, entropy, and diversity.
 
     Args:
@@ -591,6 +627,7 @@ def calculate_objective(r: np.ndarray,
 
 def objective_converged(old: float, new: float, tolerance: float) -> bool:
     """
+    Ziqi Liu
     Check whether the objective has decreased by less than the tolerance.
 
     Args:
@@ -637,6 +674,7 @@ def select_batch_levels(observed: np.ndarray,
                         level_counts: np.ndarray,
                         cutoff: float) -> np.ndarray:
     """
+    Ziqi Liu
     Select batch categories eligible for correction in one cluster.
 
     Args:
@@ -668,6 +706,7 @@ def build_ridge_penalties(expected: np.ndarray,
                           alpha: float,
                           lamb: np.ndarray | None) -> np.ndarray:
     """
+    Ziqi Liu
     Build intercept and category penalties for one cluster.
 
     Args:
@@ -702,6 +741,7 @@ def fit_ridge_model(z_orig: np.ndarray,
                     weights: np.ndarray,
                     penalties: np.ndarray) -> np.ndarray:
     """
+    Ziqi Liu
     Fit a weighted ridge model to the original coordinates.
 
     Args:
@@ -756,6 +796,7 @@ def ridge_correction(
     batch_prop_cutoff: float = 1e-5
 ) -> tuple[np.ndarray, np.ndarray, list[int]]:
     """
+    Ziqi Liu
     Remove batch effects using a weighted ridge model for each cluster.
 
     Args:
@@ -842,6 +883,7 @@ def run_harmony(
     verbose: bool = True
 ) -> dict:
     """
+    AI helps us to write this function
     Run Harmony2 batch correction on a cells-by-PCs coordinate matrix.
 
     Args:

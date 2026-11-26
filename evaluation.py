@@ -28,7 +28,10 @@ COLORS = ["#4477AA", "#EE6677", "#228833", "#CCBB44", "#AA3377"]
 
 
 def qc_summary(before_obs, after_obs, source_key):
-    """Count how many cells from each source survive preprocessing."""
+    """
+    AI generated code
+    
+    Count how many cells from each source survive preprocessing."""
     before = before_obs[source_key].value_counts().sort_index()
     after = after_obs[source_key].value_counts().reindex(before.index, fill_value=0)
 
@@ -39,7 +42,10 @@ def qc_summary(before_obs, after_obs, source_key):
 
 
 def neighbor_indices(embedding, n_neighbors=30):
-    """For each cell, find the indices of its closest OTHER cells."""
+    """
+    AI generated code
+    
+    For each cell, find the indices of its closest OTHER cells."""
     n_cells = len(embedding)
     k = min(n_neighbors, n_cells - 1)
     if k < 1:
@@ -85,7 +91,10 @@ def mixing_metrics(embedding, labels, n_neighbors=30):
 
 
 def compare_embeddings(ours, reference, n_neighbors=30):
-    """Compare our PCs with official harmonypy using common metrics.
+    """
+    AI generated code
+    
+    Compare our PCs with official harmonypy using common metrics.
 
     Pearson, RMSE, and kNN overlap are our replication checks,
     not a required three-metric test from the original Harmony paper.
@@ -126,7 +135,10 @@ def compare_embeddings(ours, reference, n_neighbors=30):
 
 
 def run_reference(pcs, metadata, source_key, parameters):
-    """Run the official implementation, separate from our own code."""
+    """
+    Written by Zhe Zhang
+
+    Run the official implementation, separate from our own code."""
     import harmonypy
     from importlib.metadata import version
 
@@ -142,7 +154,10 @@ def run_reference(pcs, metadata, source_key, parameters):
 
 
 def benchmark_methods(pcs, metadata, source_key, parameters, repeats=3):
-    """Run each method three times after warmup, then compare runtimes."""
+    """
+    AI generated code
+    
+    Run each method three times after warmup, then compare runtimes."""
     def run_ours():
         return run_harmony(pcs, metadata, source_key, **parameters, verbose=False)
 
@@ -177,7 +192,10 @@ def benchmark_methods(pcs, metadata, source_key, parameters, repeats=3):
 
 
 def make_umaps(embeddings, random_state=0):
-    """Convert each 30-dimensional embedding into two dimensions for plotting."""
+    """
+    AI generated code
+    
+    Convert each 30-dimensional embedding into two dimensions for plotting."""
     from umap import UMAP
 
     initial = embeddings["Uncorrected"][:, :2].astype(np.float32)
@@ -195,7 +213,11 @@ def make_umaps(embeddings, random_state=0):
 
 
 def plot_embedding_comparison(embeddings, umaps, labels, path):
-    """Show PCA and UMAP before correction, after ours, and after official."""
+    """
+    
+    AI generated code
+    
+    Show PCA and UMAP before correction, after ours, and after official."""
     sources = sorted(pd.unique(labels))
     color_for_source = {}
     for i, source in enumerate(sources):
@@ -240,7 +262,11 @@ def plot_embedding_comparison(embeddings, umaps, labels, path):
 
 
 def plot_diagnostics(ours, reference, timing, per_pc, path):
-    """Plot convergence, speed, and per-PC agreement with the official method."""
+    """
+    
+    AI generated code
+    
+    Plot convergence, speed, and per-PC agreement with the official method."""
     fig, axes = plt.subplots(1, 3, figsize=(14, 4), layout="constrained")
 
     axes[0].plot(ours["objective_harmony"], "o-", label="Python Harmony2")
@@ -262,7 +288,10 @@ def plot_diagnostics(ours, reference, timing, per_pc, path):
 
 
 def make_simulation(random_state=123):
-    """Create 900 cells with three known types and three known batch shifts."""
+    """
+    Written by Zhe Zhang
+    
+    Create 900 cells with three known types and three known batch shifts."""
     rng = np.random.default_rng(random_state)
     cell_types = np.repeat(np.arange(3), 300)
     batches = np.tile(np.repeat(np.arange(3), 100), 3)
@@ -283,7 +312,10 @@ def make_simulation(random_state=123):
 
 
 def evaluate_simulation(parameters, output_dir):
-    """Compare artificial clean data, shifted data, and corrected data."""
+    """
+    Wirtten by Zhe Zhang
+    
+    Compare artificial clean data, shifted data, and corrected data."""
     clean, observed, metadata = make_simulation()
     settings = dict(parameters)
     settings["nclust"] = 3
